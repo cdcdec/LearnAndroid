@@ -295,11 +295,11 @@ Table 1 shows the correlation among process state, activity state, and likelihoo
 
 > 表1显示了进程状态，活动状态和系统杀死进程的可能性之间的相关性。
 
-| Likelihood of being killed(被杀的可能性) | Process state(进程状态)                   | Activity state          |
-| ---------------------------------------- | ----------------------------------------- | ----------------------- |
-| Least                                    | Foreground (having or about to get focus) | Created,Started,Resumed |
-| More                                     | Background (lost focus)                   | Paused                  |
-| Most                                     | Background (not visible)/Empty            | Stopped/Destroyed       |
+| Likelihood of being killed(被杀的可能性) | Process state(进程状态)                      | Activity state          |
+| ---------------------------------- | ---------------------------------------- | ----------------------- |
+| Least                              | Foreground (having or about to get focus) | Created,Started,Resumed |
+| More                               | Background (lost focus)                  | Paused                  |
+| Most                               | Background (not visible)/Empty           | Stopped/Destroyed       |
 
 Table 1. Relationship between process lifecycle and activity state
 
@@ -310,6 +310,100 @@ For more information about processes in general, see Processes and Threads. For 
 > 有关一般进程的更多信息，请参阅进程和线程。有关流程生命周期如何与其中的活动状态关联的更多信息，请参阅该页面的流程生命周期部分.
 
 ##### Navigating between activities(在活动之间进行导航)
+
+An app is likely to enter and exit an activity, perhaps many times, during the app’s lifetime. For example, the user may tap the device’s Back button, or the activity may need to launch a different activity. This section covers topics you need to know to implement successful activity transitions. These topics include starting an activity from another activity, saving activity state, and restoring activity state.
+
+> 应用程序可能会在应用程序的整个生命周期中进入或退出一个活动，可能很多次。例如，用户可以点击设备的后退按钮，或者该活动可能需要启动不同的活动。本部分介绍实施成功活动转换时需要了解的主题。这些主题包括从其他活动开始活动，保存活动状态以及恢复活动状态。
+
+###### Starting one activity from another
+
+An activity often needs to start another activity at some point. This need arises, for instance, when an app needs to move from the current screen to a new one.
+
+> 一个活动通常需要在某个时候开始另一项活动。例如，当应用程序需要从当前屏幕移动到新屏幕时，就会出现这种需求。
+
+Depending on whether your activity wants a result back from the new activity it’s about to start, you start the new activity using either the startActivity() or the startActivityForResult() method. In either case, you pass in an Intent object.
+
+> 根据您的活动是否需要从新活动返回的结果，您可以使用startActivity（）或startActivityForResult（）方法启动新活动。无论哪种情况，您都会传入一个Intent对象。
+
+The Intent object specifies either the exact activity you want to start or describes the type of action you want to perform (and the system selects the appropriate activity for you, which can even be from a different application). An Intent object can also carry small amounts of data to be used by the activity that is started. For more information about the Intent class, see Intents and Intent Filters.
+
+> Intent对象指定要启动的确切活动或描述您要执行的操作的类型（并且系统会为您选择适当的活动，甚至可能来自不同的应用程序).Intent对象还可以携带少量数据供启动的活动使用。有关Intent类的更多信息，请参阅Intents和Intent Filters。
+
+###### startActivity()
+
+If the newly started activity does not need to return a result, the current activity can start it by calling the startActivity() method.
+
+> 如果新开始的活动不需要返回结果，则当前活动可以通过调用startActivity（）方法来启动它。
+
+When working within your own application, you often need to simply launch a known activity. For example, the following code snippet shows how to launch an activity called SignInActivity.
+
+> 在您的应用程序中工作时，您经常需要简单地启动已知的活动。例如，以下代码片段显示了如何启动一个名为SignInActivity的活动
+
+```
+Intent intent = new Intent(this, SignInActivity.class);
+startActivity(intent);
+```
+
+Your application might also want to perform some action, such as send an email, text message, or status update, using data from your activity. In this case, your application might not have its own activities to perform such actions, so you can instead leverage the activities provided by other applications on the device, which can perform the actions for you. This is where intents are really valuable: You can create an intent that describes an action you want to perform and the system launches the appropriate activity from another application. If there are multiple activities that can handle the intent, then the user can select which one to use. For example, if you want to allow the user to send an email message, you can create the following intent:
+
+> 您的应用程序可能还希望使用您的活动中的数据执行某些操作，例如发送电子邮件，短信或状态更新.在这种情况下，您的应用程序可能没有自己的活动来执行此类操作，因此您可以利用设备上的其他应用程序提供的活动，它们可以为您执行操作。这就是意图真正有价值的地方：您可以创建一个描述您想要执行的操作的意图，并且系统从另一个应用程序启动相应的活动。如果有多个活动可以处理意图，那么用户可以选择使用哪一个.例如，如果您想允许用户发送电子邮件，则可以创建以下意向：
+
+```
+Intent intent = new Intent(Intent.ACTION_SEND);
+intent.putExtra(Intent.EXTRA_EMAIL, recipientArray);
+startActivity(intent);
+```
+
+The EXTRA_EMAIL extra added to the intent is a string array of email addresses to which the email should be sent. When an email application responds to this intent, it reads the string array provided in the extra and places them in the "to" field of the email composition form. In this situation, the email application's activity starts and when the user is done, your activity resumes.
+
+> 添加到意图的EXTRA_EMAIL额外是电子邮件应发送到的电子邮件地址的字符串数组。当电子邮件应用程序响应此意图时，它会读取额外提供的字符串数组，并将它们放在电子邮件撰写表单的“到”字段中.在这种情况下，电子邮件应用程序的活动开始，当用户完成时，活动恢复。
+
+###### startActivityForResult()
+
+Sometimes you want to get a result back from an activity when it ends. For example, you may start an activity that lets the user pick a person in a list of contacts; when it ends, it returns the person that was selected. To do this, you call the startActivityForResult(Intent, int) method, where the integer parameter identifies the call. This identifier is meant to disambiguate between multiple calls to startActivityForResult(Intent, int) from the same activity. It's not global identifier and is not at risk of conflicting with other apps or activities.The result comes back through your onActivityResult(int, int, Intent) method.
+
+> 有时您想在活动结束时从活动中取回结果。例如，您可以开始一项活动，让用户在联系人列表中选择一个人;当它结束时，它返回被选中的人。为此，可以调用startActivityForResult（Intent，int）方法，其中integer参数标识调用。此标识符旨在消除来自同一活动的多个对startActivityForResult（Intent，int）的调用之间的歧义。这不是全局标识符，也不会与其他应用程序或活动发生冲突。结果通过onActivityResult（int，int，Intent）方法返回。
+
+When a child activity exits, it can call setResult(int) to return data to its parent. The child activity must always supply a result code, which can be the standard results RESULT_CANCELED, RESULT_OK, or any custom values starting at RESULT_FIRST_USER. In addition, the child activity can optionally return an Intent object containing any additional data it wants. The parent activity uses the onActivityResult(int, int, Intent) method, along with the integer identifier the parent activity originally supplied, to receive the information。
+
+> 当一个子活动退出时，它可以调用setResult（int）将数据返回给它的父级。子活动必须始终提供结果代码，可以是标准结果RESULT_CANCELED，RESULT_OK或从RESULT_FIRST_USER开始的任何自定义值。另外，子活动可以选择返回一个包含任何想要的附加数据的Intent对象。父活动使用onActivityResult（int，int，Intent）方法以及最初提供的父活动的整数标识符来接收信息。
+
+If a child activity fails for any reason, such as crashing, the parent activity receives a result with the code RESULT_CANCELED.
+
+> 如果某个子活动由于某种原因（例如崩溃）而失败，则父活动会收到一个结果，其结果为RESULT_CANCELED.
+
+```
+public class MyActivity extends Activity {
+     // ...
+
+     static final int PICK_CONTACT_REQUEST = 0;
+
+     public boolean onKeyDown(int keyCode, KeyEvent event) {
+         if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER) {
+             // When the user center presses, let them pick a contact.
+             startActivityForResult(
+                 new Intent(Intent.ACTION_PICK,
+                 new Uri("content://contacts")),
+                 PICK_CONTACT_REQUEST);
+            return true;
+         }
+         return false;
+     }
+
+     protected void onActivityResult(int requestCode, int resultCode,
+             Intent data) {
+         if (requestCode == PICK_CONTACT_REQUEST) {
+             if (resultCode == RESULT_OK) {
+                 // A contact was picked.  Here we will just display it
+                 // to the user.
+                 startActivity(new Intent(Intent.ACTION_VIEW, data));
+             }
+         }
+     }
+ }
+```
+
+
 
 
 
