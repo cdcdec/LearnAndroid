@@ -1,5 +1,7 @@
 ## The Activity Lifecycle
 
+> //https://developer.android.google.cn/guide/components/activities/activity-lifecycle.html#tba
+
 As a user navigates through, out of, and back to your app, the Activity instances in your app transition through different states in their lifecycle. The Activity class provides a number of callbacks that allow the activity to know that a state has changed: that the system is creating, stopping, or resuming an activity, or destroying the process in which the activity resides.
 
 > 当用户浏览，浏览并返回到您的应用程序时，您应用程序中的Activity实例将通过其生命周期中的不同状态进行转换。Activity类提供了许多回调，让活动知道状态已经改变：系统正在创建，停止或恢复活动，或销毁活动所在的进程。
@@ -403,8 +405,137 @@ public class MyActivity extends Activity {
  }
 ```
 
+######  Coordinating activities（协调活动）
 
 
 
+When one activity starts another, they both experience lifecycle transitions. The first activity stops operating and enters the Paused or Stopped state, while the other activity is created. In case these activities share data saved to disc or elsewhere, it's important to understand that the first activity is not completely stopped before the second one is created. Rather, the process of starting the second one overlaps with the process of stopping the first one.
 
-//https://developer.android.google.cn/guide/components/activities/activity-lifecycle.html#tba
+> 当一项活动开始另一项活动时，它们都会经历生命周期转换。第一个Activity停止操作并进入暂停或停止状态，而另一个Activity被创建。如果这些活动共享保存在光盘或其他地方的数据，重要的是要明白，第一个活动在创建第二个活动之前尚未完全停止。相反，启动第二个过程的进程与停止第一个进程的过程重叠。
+
+The order of lifecycle callbacks is well defined, particularly when the two activities are in the same process (app) and one is starting the other. Here's the order of operations that occur when Activity A starts Activity B:
+
+> 生命周期回调的顺序已被很好地定义，特别是当两个活动处于同一个进程（应用程序）并且一个正在启动另一个时。以下是活动A启动活动B时发生的操作顺序：
+
+1.Activity A's onPause() method executes.
+
+> 活动A的onPause（）方法执行。
+
+2.Activity B's onCreate(), onStart(), and onResume() methods execute in sequence. (Activity B now has user focus.)
+
+> Activity B的onCreate（），onStart（）和onResume（）方法按顺序执行。 （活动B现在有用户焦点。）
+
+3.Then, if Activity A is no longer visible on screen, its onStop() method executes.
+
+> 然后，如果活动A在屏幕上不再可见，则执行其onStop（）方法。
+
+###### Saving and restoring activity state(保存和恢复活动状态)
+
+There are a few scenarios in which your activity is destroyed due to normal app behavior, such as when the user presses the Back button or your activity signals its own destruction by calling the finish() method. The system may also destroy the process containing your activity to recover memory if the activity is in the Stopped state and hasn't been used in a long time, or if the foreground activity requires more resources.
+
+> 由于正常的应用程序行为,有几种情况会导致您的活动被破坏:例如，当用户按下“后退”按钮或者您的活动通过调用finish（）方法表示其自身的销毁信号。如果活动处于停止状态并且很长一段时间未使用活动，或者前台活动需要更多资源，系统还可能销毁包含活动的进程以恢复内存。
+
+When your activity is destroyed because the user presses Back or the activity finishes itself, the system's concept of that Activity instance is gone forever because the behavior indicates the activity is no longer needed. However, if the system destroys the activity due to system constraints (rather than normal app behavior), then although the actual Activity instance is gone, the system remembers that it existed such that if the user navigates back to it, the system creates a new instance of the activity using a set of saved data that describes the state of the activity when it was destroyed. The saved data that the system uses to restore the previous state is called the instance state and is a collection of key-value pairs stored in a Bundle object.
+
+> 当您的活动因用户按下“后退”或活动自行完成而被销毁时，该活动实例的系统概念将永远消失，因为该行为表示活动不再需要。但是，如果系统由于系统限制（而不是正常的应用程序行为）而破坏活动，那么虽然实际的Activity实例消失了，系统会记住它存在以至于如果用户导航回到它，系统会使用一组保存的数据创建活动的新实例，这些数据描述活动在销毁时的状态。系统用于恢复先前状态的已保存数据称为实例状态，是存储在Bundle对象中的键值对的集合。
+
+By default, the system uses the Bundle instance state to save information about each View object in your activity layout (such as the text value entered into an EditText widget). So, if your activity instance is destroyed and recreated, the state of the layout is restored to its previous state with no code required by you. However, your activity might have more state information that you'd like to restore, such as member variables that track the user's progress in the activity.
+
+> 默认情况下，系统使用Bundle实例状态来保存有关活动布局中每个View对象的信息（例如输入到EditText小部件中的文本值）。因此，如果您的活动实例被销毁并重新创建，那么布局的状态将恢复到之前的状态，并且不需要您的代码。但是，您的活动可能包含更多想要恢复的状态信息，例如跟踪用户活动进度的成员变量。
+
+A Bundle object isn't appropriate for preserving more than a trivial amount of data because it consumes system-process memory. To preserve more than a very small amount of data, you should take a combined approach to preserving data, using persistent local storage, the onSaveInstanceState() method, and the ViewModel class. For more information about preserving complex data structures, see Saving UI States.
+
+> 一个Bundle对象不适合保存多余的数据量，因为它消耗了系统进程内存。要保留超过极少量的数据，您应该采用组合方法来保存数据，使用持久本地存储，onSaveInstanceState（）方法和ViewModel类。有关保留复杂数据结构的更多信息，请参阅保存UI状态。
+
+For cases where a Bundle is appropriate, you may use the onSaveInstanceState() method. The next section provides detail about how to use this method.
+
+> 对于Bundle合适的情况，您可以使用onSaveInstanceState（）方法。下一节将详细介绍如何使用此方法。
+
+###### Save your activity state(保存你的活动状态)
+
+As your activity begins to stop, the system calls the onSaveInstanceState() method so your activity can save state information with a collection of key-value pairs. The default implementation of this method saves transient information about the state of the activity's view hierarchy, such as the text in an EditText widget or the scroll position of a ListView widget. Your app should implement the onSaveInstanceState() callback after the onPause() method, and before onStop(). Do not implement this callback in onPause().
+
+>当您的活动开始停止时，系统将调用onSaveInstanceState（）方法，以便活动可以使用一组键值对来保存状态信息。此方法的默认实现可以保存有关活动视图层次结构状态的瞬态信息，例如EditText小部件中的文本或ListView小部件的滚动位置。你的应用应该在onPause（）方法之后和onStop（）之前实现onSaveInstanceState（）回调.不要在onPause（）中实现此回调。
+
+> Caution: You must always call the superclass implementation of onSaveInstanceState() so the default implementation can save the state of the view hierarchy.
+
+> 警告：您必须始终调用onSaveInstanceState（）的超类实现，以便默认实现可以保存视图层次结构的状态。
+
+To save additional state information for your activity, you must override onSaveInstanceState() and add key-value pairs to the Bundle object that is saved in the event that your activity is destroyed unexpectedly. For example:
+
+> 为了保存活动的附加状态信息，必须重写onSaveInstanceState（）并将键值对添加到在您的活动意外销毁的事件中保存的Bundle对象。例如:
+
+```
+static final String STATE_SCORE = "playerScore";
+static final String STATE_LEVEL = "playerLevel";
+// ...
+@Override
+public void onSaveInstanceState(Bundle savedInstanceState) {
+    // Save the user's current game state
+    savedInstanceState.putInt(STATE_SCORE, mCurrentScore);
+    savedInstanceState.putInt(STATE_LEVEL, mCurrentLevel);
+
+
+    // Always call the superclass so it can save the view hierarchy state
+    super.onSaveInstanceState(savedInstanceState);
+}
+```
+
+> Note: In order for the Android system to restore the state of the views in your activity, each view must have a unique ID, supplied by the android:id attribute.
+
+> 注意：为了使Android系统恢复活动中视图的状态，每个视图必须具有由android：id属性提供的唯一ID。
+
+To save persistent data, such as user preferences or data for a database, you should take appropriate opportunities when your activity is in the foreground. If no such opportunity arises, you should save such data during the onStop() method.
+
+> 要保存持久性数据（例如用户首选项或数据库数据），当您的活动位于前台时，您应该采取适当的机会。如果没有这样的机会出现，您应该在onStop（）方法中保存这些数据。
+
+###### Restore your activity state(恢复您的活动状态)
+
+When your activity is recreated after it was previously destroyed, you can recover your saved state from the Bundle that the system passes to your activity. Both the onCreate() and onRestoreInstanceState() callback methods receive the same Bundle that contains the instance state information.
+
+> 当您的活动在之前被销毁后重新创建时，您可以从系统传递给您的活动的Bundle中恢复已保存的状态。onCreate（）和onRestoreInstanceState（）回调方法都会收到包含实例状态信息的相同Bundle。
+
+Because the onCreate() method is called whether the system is creating a new instance of your activity or recreating a previous one, you must check whether the state Bundle is null before you attempt to read it. If it is null, then the system is creating a new instance of the activity, instead of restoring a previous one that was destroyed.
+
+> 因为无论系统是创建活动的新实例还是重新创建前一个实例，都会调用onCreate（）方法，所以在尝试读取状态之前，必须检查状态Bundle是否为空。如果它为空，那么系统正在创建一个活动的新实例，而不是恢复之前被销毁的实例。
+
+For example, the following code snippet shows how you can restore some state data in onCreate():
+
+> 例如，以下代码片段显示了如何在onCreate（）中恢复某些状态数据：
+
+```
+@Override
+protected void onCreate(Bundle savedInstanceState) {
+    super.onCreate(savedInstanceState); // Always call the superclass first
+
+
+    // Check whether we're recreating a previously destroyed instance
+    if (savedInstanceState != null) {
+        // Restore value of members from saved state
+        mCurrentScore = savedInstanceState.getInt(STATE_SCORE);
+        mCurrentLevel = savedInstanceState.getInt(STATE_LEVEL);
+    } else {
+        // Probably initialize members with default values for a new instance
+    }
+    // ...
+}
+```
+
+Instead of restoring the state during onCreate() you may choose to implement onRestoreInstanceState(), which the system calls after the onStart() method. The system calls onRestoreInstanceState() only if there is a saved state to restore, so you do not need to check whether the Bundle is null:
+
+> 代替在onCreate()方法中恢复数据,你可以选择实现onRestoreInstanceState（），当系统回调onstart()方法之后.只有存在要保存的需要恢复的状态时，系统才会调用onRestoreInstanceState（），因此您不需要检查该Bundle是否为空：
+
+```
+public void onRestoreInstanceState(Bundle savedInstanceState) {
+    // Always call the superclass so it can restore the view hierarchy
+    super.onRestoreInstanceState(savedInstanceState);
+
+    // Restore state members from saved instance
+    mCurrentScore = savedInstanceState.getInt(STATE_SCORE);
+    mCurrentLevel = savedInstanceState.getInt(STATE_LEVEL);
+}
+```
+
+> Caution: Always call the superclass implementation of onRestoreInstanceState() so the default implementation can restore the state of the view hierarchy.
+
+> 警告：始终调用onRestoreInstanceState（）的超类实现，以便默认实现可以恢复视图层次结构的状态。
